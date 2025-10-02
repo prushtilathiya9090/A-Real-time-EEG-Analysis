@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Real-time EEG Analysis Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 1280px;
+            margin: auto;
+        }
+        .card {
+            background-color: #161b22;
+            border: 1px solid #232a32;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 9999px;
+            font-weight: 600;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        canvas {
+            border-radius: 8px;
+            background-color: #0e1217;
+        }
+        .custom-file-input::before {
+            content: 'Select CSV File';
+            display: inline-block;
+            background: linear-gradient(to bottom, #2b3543, #161b22);
+            border: 1px solid #232a32;
+            border-radius: 8px;
+            padding: 10px 18px;
+            outline: none;
+            white-space: nowrap;
+            cursor: pointer;
+            font-weight: 600;
+            color: #c9d1d9;
+            transition: all 0.2s;
+        }
+        .loading-animation {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #48bb78;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-green-400 mb-2">A Real-time EEG Analysis Dashboard </h1>
+            <p class="text-gray-400 text-lg">AI-powered analysis of brainwave power using the Gemini model.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Data Input and Controls -->
+            <div class="card col-span-1 h-full flex flex-col">
+                <h2 class="text-2xl font-semibold text-gray-200 mb-4">Data Source</h2>
+                <div class="input-group mb-6">
+                    <label for="eeg-file" class="block text-sm font-medium text-gray-400 mb-2">Upload EEG Report (CSV):</label>
+                    <input type="file" id="eeg-file" accept=".csv" class="custom-file-input w-full p-2 border border-gray-700 rounded-md">
+                    <p class="text-xs text-gray-500 mt-1">Expected columns: delta, theta, alpha, beta, gamma</p>
+                </div>
+                
+                <h3 class="text-xl font-semibold text-gray-200 mb-3">Waveform Selection</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <button id="btn-delta" class="wave-btn btn bg-red-600 text-white hover:bg-red-700 focus:ring-4 focus:ring-red-500">Delta</button>
+                    <button id="btn-theta" class="wave-btn btn bg-yellow-600 text-white hover:bg-yellow-700 focus:ring-4 focus:ring-yellow-500">Theta</button>
+                    <button id="btn-alpha" class="wave-btn btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-500">Alpha</button>
+                    <button id="btn-beta" class="wave-btn btn bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-500">Beta</button>
+                    <button id="btn-gamma" class="wave-btn btn bg-green-600 text-white hover:bg-green-700 focus:ring-4 focus:ring-green-500">Gamma</button>
+                </div>
+
+                <div class="mt-8">
+                    <h3 class="text-xl font-semibold text-gray-200 mb-3">Key Metrics (Overall)</h3>
+                    <div id="metrics-output" class="text-gray-400 text-sm space-y-2">
+                        <p>Upload data to calculate averages.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization and NLP Analysis -->
+            <div class="lg:col-span-2 flex flex-col space-y-8">
+                <!-- Waveform Visualization -->
+                <div class="card flex flex-col h-96">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-2xl font-semibold text-gray-200">Waveform Plot</h2>
+                        <span id="waveform-label" class="text-lg font-bold text-green-400">Default View</span>
+                    </div>
+                    <div class="relative flex-grow min-h-[300px]">
+                        <canvas id="eeg-graph" class="w-full h-full"></canvas>
+                    </div>
+                </div>
+
+                <!-- NLP Report -->
+                <div class="card flex flex-col">
+                    <h2 class="text-2xl font-semibold text-gray-200 mb-4">Automated NLP Report</h2>
+                    <div id="nlp-analysis" class="p-4 bg-gray-800 rounded-lg text-lg border border-gray-700 min-h-[100px] flex items-center">
+                        <p class="text-gray-400 italic">Analysis will be generated by the Gemini model upon waveform selection.</p>
+                    </div>
+                    <p id="dominant-wave-display" class="mt-3 text-sm text-gray-500">Analysis Status: Awaiting data upload.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Custom Modal for Errors -->
+    <div id="error-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50 hidden">
+        <div class="bg-gray-800 text-white p-6 rounded-lg max-w-sm text-center border border-red-700">
+            <p id="error-message" class="font-semibold mb-4 text-red-400"></p>
+            <button id="close-modal-btn" class="mt-4 px-4 py-2 bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const eegFile = document.getElementById('eeg-file');
+        const eegGraphCanvas = document.getElementById('eeg-graph');
+        const metricsOutput = document.getElementById('metrics-output');
+        const nlpAnalysisOutput = document.getElementById('nlp-analysis');
+        const waveformLabel = document.getElementById('waveform-label');
+        const dominantWaveDisplay = document.getElementById('dominant-wave-display');
+        const errorModal = document.getElementById('error-modal');
+        const errorMessage = document.getElementById('error-message');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const waveButtons = document.querySelectorAll('.wave-btn');
+
+        const ctx = eegGraphCanvas.getContext('2d');
+        let parsedData = [];
+        let currentWaveType = 'gamma'; // Default visualization
+        let averageMetrics = {}; // Global variable to store calculated averages
+        
+        // --- Gemini API Configuration ---
+        const API_URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+        const API_KEY = "AIzaSyBUoG84aMay3_s17ZMlzYAbVjFKHUamOKo"; 
+        const MODEL_NAME = 'gemini-2.5-flash-preview-05-20';
+
+        // --- Utility Functions ---
+
+        function showModal(message) {
+            errorMessage.textContent = message;
+            errorModal.classList.remove('hidden');
+        }
+
+        function setCanvasSize() {
+            const rect = eegGraphCanvas.parentNode.getBoundingClientRect();
+            eegGraphCanvas.width = rect.width;
+            eegGraphCanvas.height = rect.height;
+            drawGraph(parsedData.map(p => p[currentWaveType] || 0), currentWaveType);
+        }
+
+        // --- Data Parsing ---
+
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            if (lines.length < 2) {
+                throw new Error('CSV is empty or only has a header.');
+            }
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const requiredHeaders = ['delta', 'theta', 'alpha', 'beta', 'gamma'];
+            if (!requiredHeaders.every(rh => headers.includes(rh))) {
+                throw new Error('Missing one or more required headers: delta, theta, alpha, beta, gamma.');
+            }
+
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                if (values.length !== headers.length) continue; 
+                
+                const point = {};
+                headers.forEach((header, index) => {
+                    point[header] = parseFloat(values[index]) || 0;
+                });
+                data.push(point);
+            }
+            return data;
+        }
+        
+        // --- LLM Interaction ---
+
+        async function fetchNLPAnalysis(waveType, avgPower) {
+            // System instruction sets the LLM's persona
+            const systemPrompt = "You are a specialized Neuro-Linguistic Analysis system. Your task is to interpret a single brainwave's average power level from an EEG session and provide a professional, concise, and insightful two-sentence report. The first sentence should describe the physiological meaning of the wave and its associated cognitive state. The second sentence should summarize the implications of the measured power level in a clinical context. Do not use markdown headers or lists. Do not start with phrases like 'The analysis shows...' or 'Based on the data...'. Be direct.";
+            
+            // User query provides the specific data
+            const userQuery = `The ${waveType} brainwave band has an average power reading of ${avgPower.toFixed(3)} Hz across the session. Generate the analysis report.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            const apiUrl = `${API_URL_BASE}${MODEL_NAME}:generateContent?key=${API_KEY}`;
+            const maxRetries = 5;
+            let attempt = 0;
+            
+            dominantWaveDisplay.innerHTML = `<div class="flex items-center text-yellow-400">
+                <div class="loading-animation"></div> Generating NLP Report for ${waveType.toUpperCase()}...
+            </div>`;
+            nlpAnalysisOutput.innerHTML = `<p class="text-gray-400 italic">Contacting Gemini model. Please wait...</p>`;
+
+            while (attempt < maxRetries) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                         // Throw an error to trigger retry or final catch
+                        throw new Error(`API returned status ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        nlpAnalysisOutput.innerHTML = `<p>${text}</p>`;
+                        dominantWaveDisplay.innerHTML = `Analysis Complete for Wave: <span class="uppercase font-semibold text-white">${waveType}</span>`;
+                        return; // Success, exit function
+                    } else {
+                        throw new Error('LLM response missing text content.');
+                    }
+
+                } catch (error) {
+                    attempt++;
+                    if (attempt >= maxRetries) {
+                        const failMessage = `NLP generation failed after ${maxRetries} attempts. Error: ${error.message}. Displaying local fallback interpretation.`;
+                        dominantWaveDisplay.innerHTML = `Analysis Error: <span class="text-red-500">Failed to connect to LLM.</span>`;
+                        showModal(failMessage);
+                        console.error(failMessage);
+                        // Fallback message
+                        nlpAnalysisOutput.innerHTML = `<p class="text-red-400">Error generating AI analysis. Using local interpretation: Average power is ${avgPower.toFixed(3)} Hz.</p>`;
+                        return;
+                    }
+                    // Exponential backoff
+                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+
+        // Function to set up the visualization and call the LLM
+        async function generateNLPReport(waveType, metrics) {
+             // 1. Draw the selected graph (immediate feedback)
+            drawGraph(parsedData.map(p => p[waveType] || 0), waveType);
+
+            // 2. Update the NLP report using the LLM
+            await fetchNLPAnalysis(waveType, metrics[waveType]);
+        }
+
+
+        function analyzeAndDisplay(dataPoints) {
+            const numPoints = dataPoints.length;
+            if (numPoints === 0) {
+                showModal('No valid data points found in the CSV file.');
+                return;
+            }
+
+            // 1. Calculate key metrics (average power)
+            const metrics = { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 };
+            dataPoints.forEach(point => {
+                metrics.delta += point.delta || 0;
+                metrics.theta += point.theta || 0;
+                metrics.alpha += point.alpha || 0;
+                metrics.beta += point.beta || 0;
+                metrics.gamma += point.gamma || 0;
+            });
+            for (const key in metrics) {
+                metrics[key] /= numPoints;
+            }
+            // Store the metrics globally
+            averageMetrics = metrics;
+
+            // 2. Determine overall dominant wave for initial display
+            let overallDominantWave = Object.keys(metrics).reduce((a, b) => metrics[a] > metrics[b] ? a : b);
+            
+            // Define overall state for the Key Metrics box
+            const overallPrimaryState = {
+                'delta': 'Deep Sleep / Unconsciousness',
+                'theta': 'Deep Relaxation / Creativity',
+                'alpha': 'Calm Wakefulness / Resting',
+                'beta': 'Active Focus / Alertness',
+                'gamma': 'High Cognitive Function / Synthesis'
+            }[overallDominantWave] || 'Unknown';
+
+            metricsOutput.innerHTML = `
+                <p class="text-white text-md mb-2"><strong>Overall Dominant State:</strong> <span class="text-green-400">${overallPrimaryState}</span></p>
+                ${Object.keys(metrics).map(key => `
+                    <p class="capitalize">Average ${key} Power: <span class="font-mono text-white">${metrics[key].toFixed(3)} Hz</span></p>
+                `).join('')}
+            `;
+            
+            // 3. Draw the initial dominant waveform and generate initial NLP report
+            currentWaveType = overallDominantWave;
+            generateNLPReport(overallDominantWave, averageMetrics);
+        }
+
+        // --- Drawing Logic ---
+
+        function drawGraph(data, waveType) {
+            // Standard drawing logic (not changed)
+            const width = eegGraphCanvas.width;
+            const height = eegGraphCanvas.height;
+            ctx.clearRect(0, 0, width, height);
+            currentWaveType = waveType;
+
+            if (data.length === 0) {
+                waveformLabel.textContent = 'No Data';
+                return;
+            }
+
+            waveformLabel.textContent = `${waveType.charAt(0).toUpperCase() + waveType.slice(1)} Waveform`;
+
+            // Draw grid lines
+            ctx.strokeStyle = '#2d3748';
+            ctx.lineWidth = 1;
+            const horizontalLines = 4;
+            for (let i = 0; i <= horizontalLines; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, height / horizontalLines * i);
+                ctx.lineTo(width, height / horizontalLines * i);
+                ctx.stroke();
+            }
+
+            // Draw data points
+            ctx.beginPath();
+            ctx.strokeStyle = '#48bb78'; 
+            ctx.lineWidth = 2;
+            
+            const maxVal = Math.max(...data) || 1;
+            const minVal = Math.min(...data) || 0;
+            const range = maxVal - minVal;
+            const zeroOffset = range === 0 ? height / 2 : 0;
+
+            const startY = range === 0 ? zeroOffset : height - ((data[0] - minVal) / range) * height;
+            ctx.moveTo(0, startY);
+
+            for (let i = 1; i < data.length; i++) {
+                const x = (i / (data.length - 1)) * width;
+                const y = range === 0 ? zeroOffset : height - ((data[i] - minVal) / range) * height;
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        // --- Event Listeners ---
+
+        closeModalBtn.addEventListener('click', () => {
+            errorModal.classList.add('hidden');
+        });
+
+        // Event listener for file selection
+        eegFile.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const csvContent = e.target.result;
+                try {
+                    parsedData = parseCSV(csvContent);
+                    analyzeAndDisplay(parsedData);
+                } catch (error) {
+                    showModal(`Error: ${error.message}`);
+                    console.error('Error parsing CSV:', error);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Event listeners for waveform buttons
+        waveButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                if (parsedData.length === 0) {
+                    showModal('Please upload a CSV file first.');
+                    return;
+                }
+                const waveType = event.target.textContent.toLowerCase();
+                
+                // Triggers both the graph update and the LLM analysis call
+                generateNLPReport(waveType, averageMetrics);
+            });
+        });
+
+        // Initial setup
+        window.addEventListener('load', setCanvasSize);
+        window.addEventListener('resize', setCanvasSize);
+
+    </script>
+</body>
+</html>
